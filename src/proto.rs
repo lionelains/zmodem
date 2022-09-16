@@ -172,7 +172,7 @@ pub fn recv_data<RW, OUT>(header: u8, count: &mut u32, rw: &mut RW, out: &mut OU
                 debug!("CCRCG: CRC next, frame continues nonstop");
             },
             _     => {
-                panic!(format!("unexpected ZCRC byte: {:02X}", zcrc));
+                panic!("unexpected ZCRC byte: {:02X}", zcrc);
             },
         }
     }

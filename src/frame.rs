@@ -1,7 +1,6 @@
 use std::fmt;
 use consts::*;
 use crc;
-use hex::*;
 use proto;
 
 #[derive(Debug, Eq, PartialEq)]
@@ -59,7 +58,7 @@ impl Frame {
         out.append(&mut crc);
 
         if self.header == ZHEX {
-            let hex = out.drain(4..).collect::<Vec<u8>>().to_hex();
+            let hex = hex::encode(out.drain(4..).collect::<Vec<u8>>());
             out.extend_from_slice(&hex.as_bytes());
         }
 
