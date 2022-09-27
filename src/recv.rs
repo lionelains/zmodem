@@ -1,11 +1,18 @@
-use std::{thread, time};
-use std::io::{Read, Write, Result};
-use std::str::from_utf8;
+//use std::{thread, time};
+use core2::io::{Read, Write};
+
+#[cfg(feature = "std")]
+use alloc::str::from_utf8;
+
+use alloc::vec::Vec;
 
 use consts::*;
 use proto::*;
 use rwlog;
 use frame::*;
+
+use crate::Result;
+use crate::Error;
 
 #[derive(Debug, PartialEq)]
 enum State {
@@ -53,9 +60,9 @@ impl State {
 }
 
 /// Receives data by Z-Modem protocol
-pub fn recv<RW, W>(rw: RW, mut w: W) -> Result<usize> 
+pub fn recv<RW, W>(rw: RW, mut w: W, delay_10ms: &mut dyn FnMut() -> ()) -> Result<usize> 
     where RW: Read + Write,
-          W:  Write
+          W:  Write,
 {
     let mut rw_log = rwlog::ReadWriteLog::new(rw);
     let mut count = 0;
@@ -92,9 +99,16 @@ pub fn recv<RW, W>(rw: RW, mut w: W) -> Result<usize>
                     write_zrpos(&mut rw_log, count)?;
 
                     // TODO: process supplied data
-                    if let Ok(s) = from_utf8(&buf) {
-                        debug!(target: "proto", "ZFILE supplied data: {}", s);
+                    /*
+                    rprint!("Got filename \"");
+                    for c in buf {
+                        if c == 0 {
+                            break;
+                        }
+                        rprint!("{}", c as char);
                     }
+                    rprint!("\"\n");
+                    */
                 }
             },
             State::ReceivingData => {
@@ -114,7 +128,7 @@ pub fn recv<RW, W>(rw: RW, mut w: W) -> Result<usize>
             },
             State::Done => {
                 write_zfin(&mut rw_log)?;
-                thread::sleep(time::Duration::from_millis(10)); // sleep a bit
+                delay_10ms(); // sleep a bit. Lionel: needed, really?
             },
         }
     }
@@ -127,9 +141,14 @@ fn recv_error<W>(w: &mut W, state: &State, count: u32) -> Result<()>
 {
     // TODO: flush input
 
+    let result;
     match *state {
-        State::ReceivingData => write_zrpos(w, count),
-        _                    => write_znak(w),
+        State::ReceivingData => result = write_zrpos(w, count),
+        _                    => result = write_znak(w),
+    }
+    match result {
+        Ok(()) => Ok(()),
+        Err(e) => Err(Error::from(e)),
     }
 }
 

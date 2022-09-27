@@ -1,16 +1,17 @@
 [package]
 authors = ["aarbuzov"]
-name = "zmodem"
+name = "zmodem_no_std"
 license = "MIT OR Apache-2.0"
 version = "0.1.0"
 
 [dependencies]
-clap = "2.21.1"
-crc = "1.4.0"
-env_logger = "0.4.2"
-hex = "0.4.3"
-hexdump = "0.1.0"
-log = "0.3.7"
+core2 = { version = "0.4.0", default-features = false }
+#clap = "2.21.1"
+crc = { version = "1.4.0", default-features = false }
+#env_logger = "0.4.2"
+#hex = { version = "0.4.3", default-features = false }
+#hexdump = "0.1.0"
+#log = "0.3.7"
 
 [dev-dependencies]
 lazy_static = "1"

@@ -1,4 +1,4 @@
-use crc32::{crc32};
+use crc32::crc32;
 use crc32::crc32::IEEE_TABLE;
 use crc32::crc32::update;
 

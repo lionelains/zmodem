@@ -1,6 +1,10 @@
-use std::io;
-use hex::*;
-use log::LogLevel::{Debug};
+use core2::io::{self, Read, Write};
+use alloc::{vec, vec::Vec};
+use alloc::format;
+#[cfg(feature = "std")]
+use hex::FromHex;
+#[cfg(feature = "std")]
+use log::LogLevel::Debug;
 
 use consts::*;
 use frame::*;
@@ -9,7 +13,7 @@ use crc::*;
 /// Looking for sequence: ZPAD [ZPAD] ZLDE
 /// Returns true if found otherwise false
 pub fn find_zpad<R>(r: &mut R) -> io::Result<bool>
-    where R: io::Read {
+    where R: Read {
 
     // looking for first ZPAD
     if read_byte(r)? != ZPAD {
@@ -33,7 +37,7 @@ pub fn find_zpad<R>(r: &mut R) -> io::Result<bool>
 }
 
 pub fn parse_header<'a, R>(mut r: R) -> io::Result<Option<Frame>>
-    where R: io::Read {
+    where R: Read {
 
     let header = read_byte(&mut r)?;
 
@@ -53,6 +57,33 @@ pub fn parse_header<'a, R>(mut r: R) -> io::Result<Option<Frame>>
     read_exact_unescaped(r, &mut v)?;
 
     if header == ZHEX {
+        let mut from_hex = Vec::new();
+        for i in v.clone().chunks_exact(2) {
+            let c: u8= i[0];
+            let hnibble = match c {
+                b'A'..=b'F' => c - b'A' + 10,
+                b'a'..=b'f' => c - b'a' + 10,
+                b'0'..=b'9' => c - b'0',
+                _ => 255,
+            };
+            if hnibble == 255 {
+                error!("from_hex error");
+            }
+            let c: u8= i[1];
+            let lnibble = match c {
+                b'A'..=b'F' => c - b'A' + 10,
+                b'a'..=b'f' => c - b'a' + 10,
+                b'0'..=b'9' => c - b'0',
+                _ => 255,
+            };
+            if lnibble == 255 {
+                error!("from_hex error");
+            }
+            from_hex.push(hnibble << 4 | lnibble);
+        };
+        v = from_hex;
+        //The code above is a clumsy no_std equivalent to:
+        /*
         v = match FromHex::from_hex(&v) {
             Ok(x) => x,
             _     => {
@@ -60,6 +91,7 @@ pub fn parse_header<'a, R>(mut r: R) -> io::Result<Option<Frame>>
                 return Ok(None);
             },
         }
+        */
     }
 
     let crc1 = v[5..].to_vec();
@@ -89,7 +121,7 @@ pub fn parse_header<'a, R>(mut r: R) -> io::Result<Option<Frame>>
 
 /// Read out up to len bytes and remove escaped ones
 fn read_exact_unescaped<R>(mut r: R, buf: &mut [u8]) -> io::Result<()>
-    where R: io::Read {
+    where R: Read {
 
     for x in buf {
         *x = match read_byte(&mut r)? {
@@ -105,10 +137,17 @@ fn read_exact_unescaped<R>(mut r: R, buf: &mut [u8]) -> io::Result<()>
 /// Unescapes sequencies such as 'ZLDE <escaped byte>'
 /// If Ok returns <unescaped data> in buf and ZCRC* byte as return value
 pub fn recv_zlde_frame<R>(header: u8, r: &mut R, buf: &mut Vec<u8>) -> io::Result<Option<u8>>
-    where R: io::BufRead {
+    where R: Read {
 
     loop {
-        r.read_until(ZLDE, buf)?;
+        loop {
+            let in_byte = read_byte(r)?;
+            buf.push(in_byte);
+            if in_byte == ZLDE {
+                break;
+            }
+        }
+        // The code above is equivalent to r.read_until(ZLDE, buf)?;
         let b = read_byte(r)?;
 
         if !is_escaped(b) {
@@ -138,8 +177,8 @@ pub fn recv_zlde_frame<R>(header: u8, r: &mut R, buf: &mut Vec<u8>) -> io::Resul
 }
 
 pub fn recv_data<RW, OUT>(header: u8, count: &mut u32, rw: &mut RW, out: &mut OUT) -> io::Result<bool> 
-    where RW: io::Write + io::BufRead,
-         OUT: io::Write {
+    where RW: Write + Read,
+         OUT: Write {
 
     let mut buf = Vec::new();
 
@@ -152,6 +191,8 @@ pub fn recv_data<RW, OUT>(header: u8, count: &mut u32, rw: &mut RW, out: &mut OU
         };
 
         out.write_all(&buf)?;
+        //FIXME:
+        //rprintln!("{} data bytes received at 0x{:x}: {}", buf.len(), count, hex::encode(&buf));
         *count += buf.len() as u32;
 
         match zcrc {
@@ -196,14 +237,14 @@ fn is_escaped(byte: u8) -> bool {
 
 /// Reads out one byte
 fn read_byte<R>(r: &mut R) -> io::Result<u8>
-    where R: io::Read {
+    where R: Read {
     let mut b = [0; 1];
     r.read_exact(&mut b).map(|_| b[0])
 }
 
 /// Writes ZRINIT frame
 pub fn write_zrinit<W>(w: &mut W) -> io::Result<()>
-    where W: io::Write {
+    where W: Write {
 
     debug!("write ZRINIT");
     w.write_all(&Frame::new(ZHEX, ZRINIT).flags(&[0, 0, 0, 0x23]).build())
@@ -211,7 +252,7 @@ pub fn write_zrinit<W>(w: &mut W) -> io::Result<()>
 
 /// Writes ZRQINIT frame
 pub fn write_zrqinit<W>(w: &mut W) -> io::Result<()>
-    where W: io::Write {
+    where W: Write {
 
     debug!("write ZRQINIT");
     w.write_all(&Frame::new(ZHEX, ZRQINIT).build())
@@ -219,7 +260,7 @@ pub fn write_zrqinit<W>(w: &mut W) -> io::Result<()>
 
 /// Writes ZFILE frame
 pub fn write_zfile<W>(w: &mut W, filename: &str, filesize: Option<u32>) -> io::Result<()>
-    where W: io::Write {
+    where W: Write {
 
     debug!("write ZFILE");
     w.write_all(&Frame::new(ZBIN32, ZFILE).build())?;
@@ -236,7 +277,7 @@ pub fn write_zfile<W>(w: &mut W, filename: &str, filesize: Option<u32>) -> io::R
 
 /// Writes ZACK frame
 pub fn write_zack<W>(w: &mut W, count: u32) -> io::Result<()>
-    where W: io::Write {
+    where W: Write {
 
     debug!("write ZACK bytes={}", count);
     w.write_all(&Frame::new(ZHEX, ZACK).count(count).build())
@@ -244,7 +285,7 @@ pub fn write_zack<W>(w: &mut W, count: u32) -> io::Result<()>
 
 /// Writes ZFIN frame
 pub fn write_zfin<W>(w: &mut W) -> io::Result<()>
-    where W: io::Write {
+    where W: Write {
 
     debug!("write ZFIN");
     w.write_all(&Frame::new(ZHEX, ZFIN).build())
@@ -252,7 +293,7 @@ pub fn write_zfin<W>(w: &mut W) -> io::Result<()>
 
 /// Writes ZNAK frame
 pub fn write_znak<W>(w: &mut W) -> io::Result<()>
-    where W: io::Write {
+    where W: Write {
 
     debug!("write ZNAK");
     w.write_all(&Frame::new(ZHEX, ZNAK).build())
@@ -260,7 +301,7 @@ pub fn write_znak<W>(w: &mut W) -> io::Result<()>
 
 /// Writes ZRPOS frame
 pub fn write_zrpos<W>(w: &mut W, count: u32) -> io::Result<()>
-    where W: io::Write {
+    where W: Write {
 
     debug!("write ZRPOS bytes={}", count);
     w.write_all(&Frame::new(ZHEX, ZRPOS).count(count).build())
@@ -268,7 +309,7 @@ pub fn write_zrpos<W>(w: &mut W, count: u32) -> io::Result<()>
 
 /// Writes ZDATA frame
 pub fn write_zdata<W>(w: &mut W, offset: u32) -> io::Result<()>
-    where W: io::Write {
+    where W: Write {
 
     debug!("write ZDATA offset={}", offset);
     w.write_all(&Frame::new(ZBIN32, ZDATA).count(offset).build())
@@ -276,14 +317,14 @@ pub fn write_zdata<W>(w: &mut W, offset: u32) -> io::Result<()>
 
 /// Writes ZEOF frame
 pub fn write_zeof<W>(w: &mut W, offset: u32) -> io::Result<()>
-    where W: io::Write {
+    where W: Write {
 
     debug!("write ZEOF offset={}", offset);
     w.write_all(&Frame::new(ZBIN32, ZEOF).count(offset).build())
 }
 
 pub fn write_zlde_data<W>(w: &mut W, zcrc_byte: u8, data: &[u8]) -> io::Result<()>
-    where W: io::Write {
+    where W: Write {
 
     if log_enabled!(Debug) {
         debug!("  ZCRC{} subpacket, size = {}",
@@ -307,7 +348,7 @@ pub fn write_zlde_data<W>(w: &mut W, zcrc_byte: u8, data: &[u8]) -> io::Result<(
 }
 
 fn write_escape<W>(w: &mut W, data: &[u8]) -> io::Result<()>
-    where W: io::Write {
+    where W: Write {
 
     //let mut w = io::BufWriter::new(w);
 
@@ -318,7 +359,7 @@ fn write_escape<W>(w: &mut W, data: &[u8]) -> io::Result<()>
 
 /// Writes "Over & Out"
 pub fn write_over_and_out<W>(w: &mut W) -> io::Result<()>
-    where W: io::Write
+    where W: Write
 {
     w.write_all("OO".as_bytes())
 }

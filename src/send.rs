@@ -1,9 +1,11 @@
-use std::io::{Read, Write, Result, Seek, SeekFrom};
+use core2::io::{Read, Write, Seek, SeekFrom};
 
 use consts::*;
 use proto::*;
 use rwlog;
 use frame::*;
+
+use crate::Result;
 
 const SUBPACKET_SIZE: usize = 1024 * 8;
 const SUBPACKET_PER_ACK: usize = 10;

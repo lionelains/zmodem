@@ -1,7 +1,8 @@
-use std::fmt;
+use core::fmt;
 use consts::*;
 use crc;
 use proto;
+use alloc::vec::Vec;
 
 #[derive(Debug, Eq, PartialEq)]
 pub struct Frame {
@@ -58,8 +59,27 @@ impl Frame {
         out.append(&mut crc);
 
         if self.header == ZHEX {
-            let hex = hex::encode(out.drain(4..).collect::<Vec<u8>>());
-            out.extend_from_slice(&hex.as_bytes());
+            let nibble_to_hexdigit = | n: u8 | -> u8 {
+                if n > 0x0f {
+                    panic!("Input is not a nibble");
+                }
+                if n < 0x0a {
+                    '0' as u8 + n
+                }
+                else {
+                    'a' as u8 + (n - 0x0a)
+                }
+            };
+            let to_encode = out.drain(4..).collect::<Vec<u8>>();
+            for i in to_encode {
+                let hnibble = (i >> 4) & 0x0f_u8;
+                let lnibble = i & 0x0f_u8;
+                out.push(nibble_to_hexdigit(hnibble));
+                out.push(nibble_to_hexdigit(lnibble));
+            }
+            //The code above is a clumsy no_std equivalent to:
+            //let hex = hex::encode(out.drain(4..).collect::<Vec<u8>>());
+            //out.extend_from_slice(&hex.as_bytes());
         }
 
         let tmp = out.drain(3..).collect::<Vec<_>>();
