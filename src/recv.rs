@@ -8,7 +8,6 @@ use alloc::vec::Vec;
 
 use consts::*;
 use proto::*;
-use rwlog;
 use frame::*;
 
 use crate::Result;
@@ -60,25 +59,24 @@ impl State {
 }
 
 /// Receives data by Z-Modem protocol
-pub fn recv<RW, W>(rw: RW, mut w: W, delay_10ms: &mut dyn FnMut() -> ()) -> Result<usize> 
+pub fn recv<RW, W>(mut rw: RW, mut w: W, delay_10ms: &mut dyn FnMut() -> ()) -> Result<usize>
     where RW: Read + Write,
           W:  Write,
 {
-    let mut rw_log = rwlog::ReadWriteLog::new(rw);
     let mut count = 0;
 
     let mut state = State::new();
 
-    write_zrinit(&mut rw_log)?;
+    write_zrinit(&mut rw)?;
 
     while state != State::Done {
-        if !find_zpad(&mut rw_log)? {
+        if !find_zpad(&mut rw)? {
             continue;
         }
 
-        let frame = match parse_header(&mut rw_log)? {
+        let frame = match parse_header(&mut rw)? {
             Some(x) => x,
-            None    => { recv_error(&mut rw_log, &state, count)?; continue },
+            None    => { recv_error(&mut rw, &state, count)?; continue },
         };
 
         state = state.next(&frame);
@@ -87,16 +85,16 @@ pub fn recv<RW, W>(rw: RW, mut w: W, delay_10ms: &mut dyn FnMut() -> ()) -> Resu
         // do things according new state
         match state {
             State::SendingZRINIT => {
-                write_zrinit(&mut rw_log)?;
+                write_zrinit(&mut rw)?;
             },
             State::ProcessingZFILE => {
                 let mut buf = Vec::new();
 
-                if recv_zlde_frame(frame.get_header(), &mut rw_log, &mut buf)?.is_none() {
-                    write_znak(&mut rw_log)?;
+                if recv_zlde_frame(frame.get_header(), &mut rw, &mut buf)?.is_none() {
+                    write_znak(&mut rw)?;
                 }
                 else {
-                    write_zrpos(&mut rw_log, count)?;
+                    write_zrpos(&mut rw, count)?;
 
                     // TODO: process supplied data
                     /*
@@ -113,8 +111,8 @@ pub fn recv<RW, W>(rw: RW, mut w: W, delay_10ms: &mut dyn FnMut() -> ()) -> Resu
             },
             State::ReceivingData => {
                 if frame.get_count() != count ||
-                    !recv_data(frame.get_header(), &mut count, &mut rw_log, &mut w)? {
-                    write_zrpos(&mut rw_log, count)?;
+                    !recv_data(frame.get_header(), &mut count, &mut rw, &mut w)? {
+                    write_zrpos(&mut rw, count)?;
                 }
             },
             State::CheckingData => {
@@ -123,11 +121,11 @@ pub fn recv<RW, W>(rw: RW, mut w: W, delay_10ms: &mut dyn FnMut() -> ()) -> Resu
                     // receiver ignores the ZEOF because a new zdata is coming
                 }
                 else {
-                    write_zrinit(&mut rw_log)?;
+                    write_zrinit(&mut rw)?;
                 }
             },
             State::Done => {
-                write_zfin(&mut rw_log)?;
+                write_zfin(&mut rw)?;
                 delay_10ms(); // sleep a bit. Lionel: needed, really?
             },
         }
