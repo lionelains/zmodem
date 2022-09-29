@@ -55,8 +55,6 @@ macro_rules! debug {
 extern crate core2;
 extern crate alloc;
 extern crate crc as crc32;
-#[cfg(feature = "std")]
-extern crate hex;
 
 use core2::io;
 use core::fmt::{self, Formatter};

@@ -2,8 +2,6 @@ use core2::io::{self, Read, Write};
 use alloc::{vec, vec::Vec};
 use alloc::format;
 #[cfg(feature = "std")]
-use hex::FromHex;
-#[cfg(feature = "std")]
 use log::LogLevel::Debug;
 
 use consts::*;
