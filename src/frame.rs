@@ -59,10 +59,8 @@ impl Frame {
         out.append(&mut crc);
 
         if self.header == ZHEX {
-            let nibble_to_hexdigit = | n: u8 | -> u8 {
-                if n > 0x0f {
-                    panic!("Input is not a nibble");
-                }
+            let low_nibble_to_hexdigit = | n: u8 | -> u8 {
+                let n = n & 0x0f;   /* to be sure we work with a nibble, we discard bits 7 to 4 */
                 if n < 0x0a {
                     '0' as u8 + n
                 }
@@ -74,8 +72,8 @@ impl Frame {
             for i in to_encode {
                 let hnibble = (i >> 4) & 0x0f_u8;
                 let lnibble = i & 0x0f_u8;
-                out.push(nibble_to_hexdigit(hnibble));
-                out.push(nibble_to_hexdigit(lnibble));
+                out.push(low_nibble_to_hexdigit(hnibble));
+                out.push(low_nibble_to_hexdigit(lnibble));
             }
             //The code above is a clumsy no_std equivalent to:
             //let hex = hex::encode(out.drain(4..).collect::<Vec<u8>>());
