@@ -13,7 +13,6 @@
     unused_import_braces,
     unused_qualifications,
     unused_extern_crates,
-    variant_size_differences
 )]
 
 /* When depending on std, use the log library, otherwise just stub the macros to nop */
@@ -74,12 +73,6 @@ use core2::io;
 use core::fmt::{self, Formatter};
 
 #[cfg(feature = "std")]
-use std::boxed::Box;
-
-#[cfg(not(feature = "std"))]
-use alloc::boxed::Box;
-
-#[cfg(feature = "std")]
 use std::{vec, vec::Vec};
 
 #[cfg(not(feature = "std"))]
@@ -89,18 +82,22 @@ pub type Result<T> = core::result::Result<T, Error>;
 
 #[derive(Debug)]
 pub enum Error {
-    Io(Box<io::Error>),
+    Io(io::Error),
+    UnexpectedZcrcByte(u8),
 }
 
 impl From<io::Error> for Error {
     fn from(err: io::Error) -> Error {
-        Error::Io(Box::new(err))
+        Error::Io(err)
     }
 }
 
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        write!(f, "Error!")
+        match self {
+            Error::Io(e) => write!(f, "IO Error {}", e),
+            Error::UnexpectedZcrcByte(b) => write!(f, "Unexpected ZCRC byte: {:02X}", b),
+        }
     }
 }
 

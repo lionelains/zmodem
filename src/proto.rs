@@ -19,9 +19,12 @@ use consts::*;
 use frame::*;
 use crc::*;
 
+use crate::Result;
+use crate::Error;
+
 /// Looking for sequence: ZPAD [ZPAD] ZLDE
 /// Returns true if found otherwise false
-pub fn find_zpad<R>(r: &mut R) -> io::Result<bool>
+pub fn find_zpad<R>(r: &mut R) -> Result<bool>
     where R: Read {
 
     // looking for first ZPAD
@@ -45,7 +48,7 @@ pub fn find_zpad<R>(r: &mut R) -> io::Result<bool>
     Ok(true)
 }
 
-pub fn parse_header<'a, R>(mut r: R) -> io::Result<Option<Frame>>
+pub fn parse_header<'a, R>(mut r: R) -> Result<Option<Frame>>
     where R: Read {
 
     let header = read_byte(&mut r)?;
@@ -129,7 +132,7 @@ pub fn parse_header<'a, R>(mut r: R) -> io::Result<Option<Frame>>
 }
 
 /// Read out up to len bytes and remove escaped ones
-fn read_exact_unescaped<R>(mut r: R, buf: &mut [u8]) -> io::Result<()>
+fn read_exact_unescaped<R>(mut r: R, buf: &mut [u8]) -> Result<()>
     where R: Read {
 
     for x in buf {
@@ -145,7 +148,7 @@ fn read_exact_unescaped<R>(mut r: R, buf: &mut [u8]) -> io::Result<()>
 /// Receives sequence: <escaped data> ZLDE ZCRC* <CRC bytes>
 /// Unescapes sequencies such as 'ZLDE <escaped byte>'
 /// If Ok returns <unescaped data> in buf and ZCRC* byte as return value
-pub fn recv_zlde_frame<R>(header: u8, r: &mut R, buf: &mut Vec<u8>) -> io::Result<Option<u8>>
+pub fn recv_zlde_frame<R>(header: u8, r: &mut R, buf: &mut Vec<u8>) -> Result<Option<u8>>
     where R: Read {
 
     loop {
@@ -185,7 +188,7 @@ pub fn recv_zlde_frame<R>(header: u8, r: &mut R, buf: &mut Vec<u8>) -> io::Resul
     Ok(buf.pop()) // pop ZCRC* byte
 }
 
-pub fn recv_data<RW, OUT>(header: u8, count: &mut u32, rw: &mut RW, out: &mut OUT) -> io::Result<bool> 
+pub fn recv_data<RW, OUT>(header: u8, count: &mut u32, rw: &mut RW, out: &mut OUT) -> Result<bool>
     where RW: Write + Read,
          OUT: Write {
 
@@ -220,7 +223,7 @@ pub fn recv_data<RW, OUT>(header: u8, count: &mut u32, rw: &mut RW, out: &mut OU
                 debug!("CCRCG: CRC next, frame continues nonstop");
             },
             _     => {
-                panic!("unexpected ZCRC byte: {:02X}", zcrc);
+                return Err(Error::UnexpectedZcrcByte(zcrc));
             },
         }
     }
