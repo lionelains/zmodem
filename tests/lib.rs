@@ -4,6 +4,7 @@ extern crate env_logger;
 #[macro_use] extern crate lazy_static;
 extern crate rand;
 
+use std::{thread, time};
 use std::process::*;
 use std::fs::{File, remove_file, OpenOptions};
 use std::io::*;
@@ -49,6 +50,10 @@ lazy_static! {
     };
 }
 
+fn delay_10ms() {
+    thread::sleep(time::Duration::from_millis(10));
+}
+
 #[test]
 #[cfg(unix)]
 fn recv_from_sz() {
@@ -69,7 +74,7 @@ fn recv_from_sz() {
     let mut inout = InOut::new(child_stdout, child_stdin);
 
     let mut c = Cursor::new(Vec::new());
-    zmodem::recv::recv(&mut inout, &mut c).unwrap();
+    zmodem::recv::recv(&mut inout, &mut c, &mut delay_10ms).unwrap();
 
     sleep(Duration::from_millis(300));
     remove_file("recv_from_sz").unwrap();
@@ -151,7 +156,7 @@ fn lib_send_recv() {
     let outf = OpenOptions::new().write(true).open("test-fifo2").unwrap();
     let mut inout = InOut::new(inf, outf);
 
-    zmodem::recv::recv(&mut inout, &mut c).unwrap();
+    zmodem::recv::recv(&mut inout, &mut c, &mut delay_10ms).unwrap();
 
     let _ = remove_file("test-fifo1");
     let _ = remove_file("test-fifo2");

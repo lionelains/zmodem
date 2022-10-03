@@ -1,6 +1,17 @@
+#[cfg(feature = "std")]
+use std::io::{self, Read, Write};
+
+#[cfg(not(feature = "std"))]
 use core2::io::{self, Read, Write};
-use alloc::{vec, vec::Vec};
+
+use crate::vec::Vec;
+
+#[cfg(feature = "std")]
+use std::format;
+
+#[cfg(not(feature = "std"))]
 use alloc::format;
+
 #[cfg(feature = "std")]
 use log::LogLevel::Debug;
 
@@ -189,8 +200,6 @@ pub fn recv_data<RW, OUT>(header: u8, count: &mut u32, rw: &mut RW, out: &mut OU
         };
 
         out.write_all(&buf)?;
-        //FIXME:
-        //rprintln!("{} data bytes received at 0x{:x}: {}", buf.len(), count, hex::encode(&buf));
         *count += buf.len() as u32;
 
         match zcrc {

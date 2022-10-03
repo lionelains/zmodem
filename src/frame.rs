@@ -2,7 +2,7 @@ use core::fmt;
 use consts::*;
 use crc;
 use proto;
-use alloc::vec::Vec;
+use crate::vec::Vec;
 
 #[derive(Debug, Eq, PartialEq)]
 pub struct Frame {

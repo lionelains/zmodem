@@ -1,4 +1,4 @@
-#![no_std]
+#![cfg_attr(not(feature = "std"), no_std)]
 #![deny(
     //warnings,
     missing_copy_implementations,
@@ -16,6 +16,7 @@
     variant_size_differences
 )]
 
+/* When depending on std, use the log library, otherwise just stub the macros to nop */
 #[cfg(feature = "std")]
 #[macro_use]
 extern crate log;
@@ -52,13 +53,37 @@ macro_rules! debug {
     ($($arg:tt)+) => ({ });
 }
 
+#[cfg(feature = "std")]
+extern crate core;
+
+#[cfg(not(feature = "std"))]
 extern crate core2;
+
+#[cfg(not(feature = "std"))]
+#[macro_use]
 extern crate alloc;
+
 extern crate crc as crc32;
 
+#[cfg(feature = "std")]
+use std::io;
+
+#[cfg(not(feature = "std"))]
 use core2::io;
+
 use core::fmt::{self, Formatter};
+
+#[cfg(feature = "std")]
+use std::boxed::Box;
+
+#[cfg(not(feature = "std"))]
 use alloc::boxed::Box;
+
+#[cfg(feature = "std")]
+use std::{vec, vec::Vec};
+
+#[cfg(not(feature = "std"))]
+use alloc::{vec, vec::Vec};
 
 pub type Result<T> = core::result::Result<T, Error>;
 

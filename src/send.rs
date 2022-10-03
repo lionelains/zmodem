@@ -1,3 +1,7 @@
+#[cfg(feature = "std")]
+use std::io::{Read, Write, Seek, SeekFrom};
+
+#[cfg(not(feature = "std"))]
 use core2::io::{Read, Write, Seek, SeekFrom};
 
 use consts::*;

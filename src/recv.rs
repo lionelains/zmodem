@@ -1,10 +1,10 @@
-//use std::{thread, time};
+#[cfg(feature = "std")]
+use std::io::{Read, Write};
+
+#[cfg(not(feature = "std"))]
 use core2::io::{Read, Write};
 
-#[cfg(feature = "std")]
-use alloc::str::from_utf8;
-
-use alloc::vec::Vec;
+use crate::Vec;
 
 use consts::*;
 use proto::*;
